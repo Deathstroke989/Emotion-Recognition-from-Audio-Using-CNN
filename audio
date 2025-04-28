@@ -1,0 +1,52 @@
+import numpy as np
+import librosa
+import os
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from keras._tf_keras.keras.models import Sequential
+from keras._tf_keras.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from keras._tf_keras.keras.utils import to_categorical
+
+# Parameters
+dataset_path = 'D:/audio/'
+sample_rate = 22050
+max_time = 3
+n_mfcc = 40
+
+# Load data
+data, labels = [], []
+for root, _, files in os.walk(dataset_path):
+    for file in files:
+        if file.endswith('.wav'):
+            file_path = os.path.join(root, file)
+            audio, _ = librosa.load(file_path, sr=sample_rate)
+            audio = librosa.util.fix_length(audio, size=sample_rate * max_time)
+            mfcc = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=n_mfcc).T
+            emotion = int(file.split('-')[2]) - 1
+            data.append(mfcc)
+            labels.append(emotion)
+
+# Prepare data
+X = np.array(data)[..., np.newaxis]
+y = to_categorical(LabelEncoder().fit_transform(labels))
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Build CNN
+model = Sequential([
+    Conv2D(32, (3, 3), activation='relu', input_shape=X_train.shape[1:]),
+    MaxPooling2D((2, 2)),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.5),
+    Dense(y.shape[1], activation='softmax')
+])
+
+# Train and evaluate
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model.fit(X_train, y_train, epochs=20, batch_size=32, validation_data=(X_test, y_test))
+loss, accuracy = model.evaluate(X_test, y_test)
+print(f'Test Accuracy: {accuracy:.4f}')
+print(model.predict(X_test))
+model.save("d:/audio1.keras")
